@@ -64,7 +64,9 @@
 
 ## About The Project
 
-<img src="img/screenshot.png" width="70%" style="margin-left:15%">
+<p align="center">
+<img src="img/screenshot.png" width="70%">
+</p>
 
 This is a literally one-day project for exploring the possibility of using Streamlit to build a game for remote players, and have some fun with my friends BTW.
 
@@ -121,7 +123,9 @@ The game based on [Freestyle Gomoku rule](https://en.wikipedia.org/wiki/Gomoku#F
 
 Click the `Switch to Local mode` button in the sidebar, then enjoy your game!
 
-<img src="img/local-demo.gif" width="50%" style="margin-left:25%">
+<p align="center">
+  <img src="img/local-demo.gif" width="50%">
+</p>
 
 <small style="color:grey">The thing is that, without clicking this button, as long as no room is created or joined, the game is the same in both game play mode</small>
 
@@ -131,7 +135,9 @@ Click the `Switch to Local mode` button in the sidebar, then enjoy your game!
 - You can create and share a room by clicking `Create new room` in the sidebar and copy the generated room ID to your friends
 - Or you may join an existing room by pasting the room ID into the text input area and click `Join room`, the game will automatically sync the play status between browsers.
 
-<img src="img/remote-demo.gif" width="80%" style="margin-left:10%">
+<p align="center">
+<img src="img/remote-demo.gif" width="80%">
+</p>
 
 <!-- ROADMAP -->
 
