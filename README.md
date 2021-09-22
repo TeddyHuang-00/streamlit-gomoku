@@ -8,15 +8,17 @@
 
 <!-- PROJECT LOGO -->
 <br />
-<center>
+<p align="center">
   <a href="https://github.com/TeddyHuang-00/streamlit-gomoku">
     <img src="img/logo.png" alt="Logo" width="120" height="120">
   </a>
-  <h2>streamlit-gomoku</h2>
-A simple Gomoku game built with Streamlit.
-</center>
+  <h2 align="center">streamlit-gomoku</h2>
+  <p align="center">
+  A simple Gomoku game built with Streamlit.
+  </p>
+</p>
 
-<center>
+<p align="center">
 <br />
 <a href="https://github.com/TeddyHuang-00/streamlit-gomoku"><strong>Explore the docs »</strong></a>
 <br />
@@ -27,7 +29,7 @@ A simple Gomoku game built with Streamlit.
 <a href="https://github.com/TeddyHuang-00/streamlit-gomoku/issues">Request Feature</a>
 <br />
 <br />
-</center>
+</p>
 
 <!-- TABLE OF CONTENTS -->
 <details open="open">
@@ -179,6 +181,7 @@ Project Link: [streamlit-gomoku](https://github.com/TeddyHuang-00/streamlit-gomo
 - [Streamlit](https://streamlit.io/)
 - [Streamlit server state](https://github.com/whitphx/streamlit-server-state)
 - [Best README Template](https://github.com/othneildrew/Best-README-Template)
+- [Img Shields](https://shields.io)
 
 <!-- MARKDOWN LINKS & IMAGES -->
 <!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
