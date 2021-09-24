@@ -117,6 +117,8 @@ pip3 install -r requirements.txt
 
 The game based on [Freestyle Gomoku rule](https://en.wikipedia.org/wiki/Gomoku#Freestyle_Gomoku).
 
+**Update**: Now you can try it out on [Streamlit Cloud](https://share.streamlit.io/teddyhuang-00/streamlit-gomoku/main/gomoku.py)!
+
 ### How to play
 
 #### **Local Game**
