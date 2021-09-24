@@ -11,7 +11,6 @@ from uuid import uuid4
 
 import numpy as np
 import streamlit as slt
-from streamlit.delta_generator import DeltaGenerator
 from scipy.signal import convolve
 from streamlit_server_state import server_state, server_state_lock
 
@@ -476,10 +475,11 @@ def gomoku():
                         """
                         )
 
+    # The main game loop
     switch_multiplayer()
     draw_info()
 
-    # Wait for opponent
+    # Additional steps for remote play
     if slt.session_state.ROOM is not None:
         draw_board(False)
         round_info()
