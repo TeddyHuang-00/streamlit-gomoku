@@ -480,19 +480,22 @@ def gomoku():
     switch_multiplayer()
     draw_info()
 
-    # Additional steps for remote play
     if slt.session_state.ROOM is not None:
-        draw_board(False)
-        round_info()
-        with slt.spinner("Waiting for opponent's next move..."):
-            while (
-                slt.session_state.ROOM in server_state.ROOMS.keys()
-                and server_state.ROOMS[slt.session_state.ROOM].WINNER == _BLANK
-                and server_state.ROOMS[slt.session_state.ROOM].TURN
-                != _ROOM_COLOR[slt.session_state.OWNER]
-            ):
-                time.sleep(1)
         sync_room()
+
+    # # Additional steps for remote play
+    # if slt.session_state.ROOM is not None:
+    #     draw_board(False)
+    #     round_info()
+    #     with slt.spinner("Waiting for opponent's next move..."):
+    #         while (
+    #             slt.session_state.ROOM in server_state.ROOMS.keys()
+    #             and server_state.ROOMS[slt.session_state.ROOM].WINNER == _BLANK
+    #             and server_state.ROOMS[slt.session_state.ROOM].TURN
+    #             != _ROOM_COLOR[slt.session_state.OWNER]
+    #         ):
+    #             time.sleep(1)
+    #     sync_room()
 
     history()
     draw_board(True)
