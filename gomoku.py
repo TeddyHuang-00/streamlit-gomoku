@@ -186,10 +186,11 @@ def gomoku():
             if room_id not in server_state.ROOMS.keys():
                 PLAY_MODE_INFO.error("Room not found, maybe time out")
                 slt.experimental_rerun()
-            with server_state_lock["ROOMS"]:
-                if server_state.ROOMS[room_id].TIME == slt.session_state.TIME:
-                    return False
-                elif server_state.ROOMS[room_id].TIME < slt.session_state.TIME:
+            if server_state.ROOMS[room_id].TIME == slt.session_state.TIME:
+                return False
+            elif server_state.ROOMS[room_id].TIME < slt.session_state.TIME:
+                # Only acquire the lock when writing to the server state
+                with server_state_lock["ROOMS"]:
                     server_state.ROOMS[room_id].BOARD = slt.session_state.BOARD
                     server_state.ROOMS[room_id].PLAYER = slt.session_state.PLAYER
                     server_state.ROOMS[room_id].TURN = slt.session_state.TURN
@@ -197,14 +198,14 @@ def gomoku():
                     server_state.ROOMS[room_id].HISTORY = slt.session_state.HISTORY
                     server_state.ROOMS[room_id].TIME = slt.session_state.TIME
                     return True
-                else:
-                    slt.session_state.BOARD = server_state.ROOMS[room_id].BOARD
-                    slt.session_state.PLAYER = server_state.ROOMS[room_id].PLAYER
-                    slt.session_state.TURN = server_state.ROOMS[room_id].TURN
-                    slt.session_state.WINNER = server_state.ROOMS[room_id].WINNER
-                    slt.session_state.HISTORY = server_state.ROOMS[room_id].HISTORY
-                    slt.session_state.TIME = server_state.ROOMS[room_id].TIME
-                    return True
+            else:
+                slt.session_state.BOARD = server_state.ROOMS[room_id].BOARD
+                slt.session_state.PLAYER = server_state.ROOMS[room_id].PLAYER
+                slt.session_state.TURN = server_state.ROOMS[room_id].TURN
+                slt.session_state.WINNER = server_state.ROOMS[room_id].WINNER
+                slt.session_state.HISTORY = server_state.ROOMS[room_id].HISTORY
+                slt.session_state.TIME = server_state.ROOMS[room_id].TIME
+                return True
         else:
             return False
 
