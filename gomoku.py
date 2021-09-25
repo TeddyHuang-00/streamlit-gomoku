@@ -19,6 +19,11 @@ slt.set_page_config(
     page_title="Gomoku Game",
     page_icon="5️⃣",
     initial_sidebar_state="expanded",
+    menu_items={
+        "Report a bug": "https://github.com/TeddyHuang-00/streamlit-gomoku/issues/new/choose",
+        "Get Help": "https://discuss.streamlit.io/t/pvp-gomoku-game-in-streamlit/17403",
+        "About": "Welcome to this web-based Gomoku game!\n\nHave any comment? Please let me know through [this post](https://discuss.streamlit.io/t/pvp-gomoku-game-in-streamlit/17403) or [issues](https://github.com/TeddyHuang-00/streamlit-gomoku/issues/new/choose)!\n\nIf you find this interesting, please leave a star in the [GitHub repo](https://github.com/TeddyHuang-00/streamlit-gomoku)",
+    },
 )
 
 # Utils
@@ -111,7 +116,7 @@ if "ROOMS" not in server_state:
     with server_state_lock["ROOMS"]:
         server_state.ROOMS = {}
 
-# Layout
+# # Layout
 # Main
 TITLE = slt.empty()
 ROUND_INFO = slt.empty()
@@ -125,6 +130,7 @@ SCORE_PLATE = slt.sidebar.columns(2)
 PLAY_MODE_INFO = slt.sidebar.container()
 MULTIPLAYER_PLATE = slt.sidebar.empty()
 MULTIPLAYER_TAG = slt.sidebar.empty()
+GAME_CONTROL = slt.sidebar.container()
 GAME_INFO = slt.sidebar.container()
 
 
@@ -165,7 +171,7 @@ def gomoku():
         Continue new round.
         """
         if (
-            not slt.session_state.LOCAL
+            slt.session_state.ROOM is not None
             and slt.session_state.ROOM in server_state.ROOMS.keys()
             and slt.session_state.WINNER
             != server_state.ROOMS[slt.session_state.ROOM].WINNER
@@ -184,7 +190,7 @@ def gomoku():
         room_id = slt.session_state.ROOM
         if room_id is not None:
             if room_id not in server_state.ROOMS.keys():
-                PLAY_MODE_INFO.error("Room not found, maybe time out")
+                slt.session_state.ROOM = None
                 slt.experimental_rerun()
             if server_state.ROOMS[room_id].TIME == slt.session_state.TIME:
                 return False
@@ -197,6 +203,8 @@ def gomoku():
                     server_state.ROOMS[room_id].WINNER = slt.session_state.WINNER
                     server_state.ROOMS[room_id].HISTORY = slt.session_state.HISTORY
                     server_state.ROOMS[room_id].TIME = slt.session_state.TIME
+                    with server_state_lock[slt.session_state.ROOM]:
+                        server_state[slt.session_state.ROOM] = slt.session_state.TIME
                     return True
             else:
                 slt.session_state.BOARD = server_state.ROOMS[room_id].BOARD
@@ -373,6 +381,8 @@ def gomoku():
                 try:
                     with server_state_lock["ROOMS"]:
                         del server_state.ROOMS[slt.session_state.ROOM]
+                    with server_state_lock[slt.session_state.ROOM]:
+                        del server_state[slt.session_state.ROOM]
                 except KeyError:
                     # Already deleted
                     pass
@@ -402,14 +412,40 @@ def gomoku():
 
     # Game process control
     def game_control():
+        if slt.session_state.ROOM is not None:
+            # Handles syncing in remote play
+            if slt.session_state.ROOM not in server_state:
+                slt.session_state.ROOM = None
+                slt.experimental_rerun()
+            else:
+                sync_room()
+            slt.session_state["counter"] = server_state[slt.session_state.ROOM]
+            if slt.session_state.ROOM not in server_state.ROOMS.keys():
+                slt.warning("Room not found")
+                restart()
+            elif slt.session_state.WINNER != _BLANK:
+                draw_board(False)
+            elif (
+                _ROOM_COLOR[slt.session_state.OWNER]
+                != server_state.ROOMS[slt.session_state.ROOM].TURN
+            ):
+                slt.warning("Waiting for opponent...")
+                draw_board(False)
+            else:
+                sync_room()
+                draw_board(True)
+        elif slt.session_state.WINNER != _BLANK:
+            draw_board(False)
+        else:
+            draw_board(True)
         if slt.session_state.WINNER != _BLANK or 0 not in slt.session_state.BOARD:
-            PLAY_MODE_INFO.button(
+            GAME_CONTROL.button(
                 "Another round",
                 on_click=another_round,
                 help="Clear board and swap first player",
             )
         if slt.session_state.LOCAL or slt.session_state.OWNER:
-            PLAY_MODE_INFO.button(
+            GAME_CONTROL.button(
                 "Restart",
                 on_click=restart,
                 help="Clear the board as well as the scores",
@@ -442,15 +478,19 @@ def gomoku():
                             }
                             # Create if available
                             if len(server_state.ROOMS) < _ROOM_LIMIT:
-                                room_id = str(uuid4()).lower()
+                                room_id = "RM" + str(uuid4()).upper()[-12:]
                                 server_state.ROOMS[room_id] = Room(room_id)
+                                with server_state_lock[room_id]:
+                                    server_state[room_id] = server_state.ROOMS[
+                                        room_id
+                                    ].TIME
                                 enter_room(room_id, True)
                             else:
                                 slt.warning("Server full! Please try again later")
                 if slt.session_state.ROOM is None:
                     ROOM_ID = (
                         slt.text_input("Enter the room ID on your invitation")
-                        .lower()
+                        .upper()
                         .strip()
                     )
                     slt.button(
@@ -477,27 +517,11 @@ def gomoku():
                         )
 
     # The main game loop
+    game_control()
     switch_multiplayer()
     draw_info()
-
-    # Additional steps for remote play
-    if slt.session_state.ROOM is not None:
-        draw_board(False)
-        round_info()
-        with slt.spinner("Waiting for opponent's next move..."):
-            while (
-                slt.session_state.ROOM in server_state.ROOMS.keys()
-                and server_state.ROOMS[slt.session_state.ROOM].WINNER == _BLANK
-                and server_state.ROOMS[slt.session_state.ROOM].TURN
-                != _ROOM_COLOR[slt.session_state.OWNER]
-            ):
-                time.sleep(1)
-        sync_room()
-
     history()
-    draw_board(True)
     round_info()
-    game_control()
 
 
 if __name__ == "__main__":
