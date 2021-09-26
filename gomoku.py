@@ -13,6 +13,7 @@ from uuid import uuid4
 import numpy as np
 import streamlit as slt
 from scipy.signal import convolve
+from streamlit import session_state
 from streamlit_server_state import server_state, server_state_lock
 
 # Page configuration
@@ -100,12 +101,10 @@ _ROOM_ANNOTATION = {
 }
 
 # Initialize the game
-if "ROOM" not in slt.session_state:
-    slt.session_state.ROOM = Room("local")
-if "OWNER" not in slt.session_state:
-    slt.session_state.OWNER = False
-if "QUEUE" not in slt.session_state:
-    slt.session_state.QUEUE = []
+if "ROOM" not in session_state:
+    session_state.ROOM = Room("local")
+if "OWNER" not in session_state:
+    session_state.OWNER = False
 
 # Check server health
 if "ROOMS" not in server_state:
@@ -119,17 +118,24 @@ ROUND_INFO = slt.empty()
 BOARD_PLATE = [
     [cell.empty() for cell in slt.columns([1 for _ in range(15)])] for _ in range(15)
 ]
-BUTTON_PLATE = slt.empty()
-LOGS = slt.container()
+WAIT_FOR_OPPONENT = slt.empty()
+
 # Sidebar
 SCORE_TAG = slt.sidebar.empty()
 SCORE_PLATE = slt.sidebar.columns(2)
 PLAY_MODE_INFO = slt.sidebar.container()
-MULTIPLAYER_PLATE = slt.sidebar.empty()
+with slt.sidebar.expander("Remote play!", expanded=True):
+    CREATE_ROOM = slt.empty()
+    ROOM_INFO = slt.empty()
+    ROOM_ID_INPUT = slt.empty()
+    JOIN_ROOM = slt.empty()
+    ROOM_ID_ERROR = slt.empty()
 MULTIPLAYER_TAG = slt.sidebar.empty()
-GAME_CONTROL = slt.sidebar.container()
+with slt.sidebar.container():
+    ANOTHER_ROUND = slt.empty()
+    RESTART = slt.empty()
+    EXIT = slt.empty()
 GAME_INFO = slt.sidebar.container()
-
 
 # Draw the board
 def gomoku():
@@ -143,8 +149,8 @@ def gomoku():
         """
         Restart the game.
         """
-        slt.session_state.ROOM = Room(slt.session_state.ROOM.ROOM_ID)
-        if slt.session_state.ROOM.ROOM_ID != "local":
+        session_state.ROOM = Room(session_state.ROOM.ROOM_ID)
+        if session_state.ROOM.ROOM_ID != "local":
             sync_room()
 
     # Continue new round
@@ -152,32 +158,32 @@ def gomoku():
         """
         Continue new round.
         """
-        slt.session_state.ROOM = deepcopy(slt.session_state.ROOM)
-        slt.session_state.ROOM.BOARD = np.zeros(shape=(15, 15), dtype=int)
-        slt.session_state.ROOM.PLAYER = -slt.session_state.ROOM.PLAYER
-        slt.session_state.ROOM.TURN = slt.session_state.ROOM.PLAYER
-        slt.session_state.ROOM.WINNER = _BLANK
-        if slt.session_state.ROOM.ROOM_ID != "local":
-            slt.session_state.ROOM.TIME = time.time()
+        session_state.ROOM = deepcopy(session_state.ROOM)
+        session_state.ROOM.BOARD = np.zeros(shape=(15, 15), dtype=int)
+        session_state.ROOM.PLAYER = -session_state.ROOM.PLAYER
+        session_state.ROOM.TURN = session_state.ROOM.PLAYER
+        session_state.ROOM.WINNER = _BLANK
+        if session_state.ROOM.ROOM_ID != "local":
+            session_state.ROOM.TIME = time.time()
             sync_room()
 
     # Room status sync
     def sync_room() -> bool:
-        room_id = slt.session_state.ROOM.ROOM_ID
+        room_id = session_state.ROOM.ROOM_ID
         if room_id not in server_state.ROOMS.keys():
-            slt.session_state.ROOM = Room("local")
+            session_state.ROOM = Room("local")
             return False
-        elif server_state.ROOMS[room_id].TIME == slt.session_state.ROOM.TIME:
+        elif server_state.ROOMS[room_id].TIME == session_state.ROOM.TIME:
             return False
-        elif server_state.ROOMS[room_id].TIME < slt.session_state.ROOM.TIME:
+        elif server_state.ROOMS[room_id].TIME < session_state.ROOM.TIME:
             # Only acquire the lock when writing to the server state
             with server_state_lock["ROOMS"]:
                 server_rooms = server_state.ROOMS
-                server_rooms[room_id] = slt.session_state.ROOM
+                server_rooms[room_id] = session_state.ROOM
                 server_state.ROOMS = server_rooms
             return True
         else:
-            slt.session_state.ROOM = server_state.ROOMS[room_id]
+            session_state.ROOM = server_state.ROOMS[room_id]
             return True
 
     # Check if winner emerge from move
@@ -186,22 +192,22 @@ def gomoku():
         Use convolution to check if any player wins.
         """
         vertical = convolve(
-            slt.session_state.ROOM.BOARD,
+            session_state.ROOM.BOARD,
             _VERTICAL,
             mode="same",
         )
         horizontal = convolve(
-            slt.session_state.ROOM.BOARD,
+            session_state.ROOM.BOARD,
             _HORIZONTAL,
             mode="same",
         )
         diagonal_up_left = convolve(
-            slt.session_state.ROOM.BOARD,
+            session_state.ROOM.BOARD,
             _DIAGONAL_UP_LEFT,
             mode="same",
         )
         diagonal_up_right = convolve(
-            slt.session_state.ROOM.BOARD,
+            session_state.ROOM.BOARD,
             _DIAGONAL_UP_RIGHT,
             mode="same",
         )
@@ -238,33 +244,33 @@ def gomoku():
         """
         Controls whether to pass on / continue current board / may start new round
         """
-        if slt.session_state.ROOM.BOARD[x][y] != _BLANK:
+        if session_state.ROOM.BOARD[x][y] != _BLANK:
             pass
         elif (
-            slt.session_state.ROOM.ROOM_ID in server_state.ROOMS.keys()
-            and _ROOM_COLOR[slt.session_state.OWNER]
-            != server_state.ROOMS[slt.session_state.ROOM.ROOM_ID].TURN
+            session_state.ROOM.ROOM_ID in server_state.ROOMS.keys()
+            and _ROOM_COLOR[session_state.OWNER]
+            != server_state.ROOMS[session_state.ROOM.ROOM_ID].TURN
         ):
             sync_room()
-        elif slt.session_state.ROOM.WINNER == _BLANK:
-            slt.session_state.ROOM = deepcopy(slt.session_state.ROOM)
-            slt.session_state.ROOM.BOARD[x][y] = slt.session_state.ROOM.TURN
-            slt.session_state.ROOM.TURN = -slt.session_state.ROOM.TURN
-            slt.session_state.ROOM.WINNER = check_win()
-            slt.session_state.ROOM.HISTORY = (
-                slt.session_state.ROOM.HISTORY[0]
-                + int(slt.session_state.ROOM.WINNER == _WHITE),
-                slt.session_state.ROOM.HISTORY[1]
-                + int(slt.session_state.ROOM.WINNER == _BLACK),
+        elif session_state.ROOM.WINNER == _BLANK:
+            session_state.ROOM = deepcopy(session_state.ROOM)
+            session_state.ROOM.BOARD[x][y] = session_state.ROOM.TURN
+            session_state.ROOM.TURN = -session_state.ROOM.TURN
+            session_state.ROOM.WINNER = check_win()
+            session_state.ROOM.HISTORY = (
+                session_state.ROOM.HISTORY[0]
+                + int(session_state.ROOM.WINNER == _WHITE),
+                session_state.ROOM.HISTORY[1]
+                + int(session_state.ROOM.WINNER == _BLACK),
             )
-            slt.session_state.ROOM.TIME = time.time()
-            if slt.session_state.ROOM.ROOM_ID != "local":
+            session_state.ROOM.TIME = time.time()
+            if session_state.ROOM.ROOM_ID != "local":
                 sync_room()
 
     # Draw board
     def draw_board(response: bool):
         if response:
-            for i, row in enumerate(slt.session_state.ROOM.BOARD):
+            for i, row in enumerate(session_state.ROOM.BOARD):
                 for j, cell in enumerate(row):
                     BOARD_PLATE[i][j].button(
                         _PLAYER_SYMBOL[cell],
@@ -273,7 +279,7 @@ def gomoku():
                         args=(i, j),
                     )
         else:
-            for i, row in enumerate(slt.session_state.ROOM.BOARD):
+            for i, row in enumerate(session_state.ROOM.BOARD):
                 for j, cell in enumerate(row):
                     BOARD_PLATE[i][j].write(
                         _PLAYER_SYMBOL[cell],
@@ -286,144 +292,131 @@ def gomoku():
         Enter room.
         """
         if len(room_id) == 0:
-            PLAY_MODE_INFO.warning("Please enter a room id")
+            ROOM_ID_ERROR.warning("Please enter a room id")
             return
         if room_id not in server_state.ROOMS.keys():
-            PLAY_MODE_INFO.error("Room not found")
+            ROOM_ID_ERROR.error("Room not found")
             return
-        slt.session_state.ROOM = server_state.ROOMS[room_id]
-        slt.session_state.OWNER = is_owner
+        session_state.ROOM = server_state.ROOMS[room_id]
+        session_state.OWNER = is_owner
+
+    # Display room info
+    def room_info():
+        if session_state.ROOM.ROOM_ID == "local":
+            ROOM_INFO.empty()
+            ROOM_ID = (
+                ROOM_ID_INPUT.text_input(
+                    "Enter the room ID on your invitation", key="INPUT_ROOM_ID"
+                )
+                .upper()
+                .strip()
+            )
+            if JOIN_ROOM.button("Join room"):
+                enter_room(ROOM_ID, False)
+                if session_state.ROOM.ROOM_ID != "local":
+                    JOIN_ROOM.empty()
+        elif session_state.OWNER:
+            ROOM_INFO.write(
+                f"""
+            **Room created!**
+
+            Room ID: **{session_state.ROOM.ROOM_ID}**
+
+            Share the ID to your friend for an exciting online game!
+            """
+            )
+        else:
+            ROOM_INFO.write(
+                f"""
+            Room **{session_state.ROOM.ROOM_ID}** joined!
+            """
+            )
 
     # Multiplayer switch
     def switch_multiplayer():
-        if slt.session_state.ROOM.ROOM_ID == "local":
-            with MULTIPLAYER_PLATE.expander("Remote play!", expanded=True):
-                if slt.session_state.ROOM.ROOM_ID == "local":
-                    if slt.button("Create new room"):
-                        slt.session_state.OWNER = True
-                        # Remove old room
-                        with server_state_lock["ROOMS"]:
-                            server_state.ROOMS = {
-                                room_id: room
-                                for room_id, room in server_state.ROOMS.items()
-                                if time.time() - room.TIME < _ROOM_TIMEOUT
-                            }
-                        # Create if available
-                        if len(server_state.ROOMS) < _ROOM_LIMIT:
-                            room_id = "RM" + str(uuid4()).upper()[-12:]
-                            with server_state_lock["ROOMS"]:
-                                server_state.ROOMS[room_id] = Room(room_id)
-                            enter_room(room_id, True)
-                        else:
-                            slt.warning("Server full! Please try again later")
-                if slt.session_state.ROOM.ROOM_ID == "local":
-                    ROOM_ID = (
-                        slt.text_input(
-                            "Enter the room ID on your invitation", key="INPUT_ROOM_ID"
-                        )
-                        .upper()
-                        .strip()
-                    )
-                    slt.button(
-                        "Join room",
-                        on_click=enter_room,
-                        args=(ROOM_ID, False),
-                    )
+        if session_state.ROOM.ROOM_ID == "local":
+            if CREATE_ROOM.button("Create new room"):
+                session_state.OWNER = True
+                # Remove old room
+                with server_state_lock["ROOMS"]:
+                    server_state.ROOMS = {
+                        room_id: room
+                        for room_id, room in server_state.ROOMS.items()
+                        if time.time() - room.TIME < _ROOM_TIMEOUT
+                    }
+                # Create if available
+                if len(server_state.ROOMS) < _ROOM_LIMIT:
+                    room_id = "RM" + str(uuid4()).upper()[-12:]
+                    with server_state_lock["ROOMS"]:
+                        server_state.ROOMS[room_id] = Room(room_id)
+                    enter_room(room_id, True)
+                    CREATE_ROOM.empty()
                 else:
-                    if slt.session_state.OWNER:
-                        slt.write(
-                            f"""
-                        **Room created!**
-
-                        Room ID: **{slt.session_state.ROOM.ROOM_ID}**
-
-                        Share the ID to your friend for an exciting online game!
-                        """
-                        )
-                    elif not slt.session_state.OWNER:
-                        slt.write(
-                            f"""
-                        Room **{slt.session_state.ROOM.ROOM_ID}** joined!
-                        """
-                        )
+                    ROOM_INFO.warning("Server full! Please try again later")
+        room_info()
 
     # Game process control
     def game_control():
-        slt.session_state.QUEUE = []
-        if slt.session_state.ROOM.ROOM_ID != "local":
+        if session_state.ROOM.ROOM_ID != "local":
             # Handles syncing in remote play
-            if slt.session_state.ROOM.ROOM_ID not in server_state.ROOMS.keys():
-                slt.session_state.ROOM = Room("local")
+            if session_state.ROOM.ROOM_ID not in server_state.ROOMS.keys():
+                session_state.ROOM = Room("local")
                 slt.experimental_rerun()
             else:
                 sync_room()
-            if slt.session_state.ROOM.WINNER != _BLANK:
+            if session_state.ROOM.WINNER != _BLANK:
                 draw_board(False)
             elif (
-                slt.session_state.ROOM.ROOM_ID in server_state.ROOMS.keys()
-                and _ROOM_COLOR[slt.session_state.OWNER]
-                != server_state.ROOMS[slt.session_state.ROOM.ROOM_ID].TURN
+                session_state.ROOM.ROOM_ID in server_state.ROOMS.keys()
+                and _ROOM_COLOR[session_state.OWNER]
+                != server_state.ROOMS[session_state.ROOM.ROOM_ID].TURN
             ):
-                slt.warning("Waiting for opponent...")
+                WAIT_FOR_OPPONENT.info("Waiting for opponent...")
                 draw_board(False)
             else:
+                WAIT_FOR_OPPONENT.empty()
                 sync_room()
                 draw_board(True)
-        elif slt.session_state.ROOM.WINNER != _BLANK:
+        elif session_state.ROOM.WINNER != _BLANK:
             draw_board(False)
         else:
             draw_board(True)
         if (
-            slt.session_state.ROOM.WINNER != _BLANK
-            or 0 not in slt.session_state.ROOM.BOARD
+            session_state.ROOM.WINNER != _BLANK
+            or 0 not in session_state.ROOM.BOARD
         ):
-            GAME_CONTROL.button(
+            ANOTHER_ROUND.button(
                 "Another round",
                 on_click=another_round,
                 help="Clear board and swap first player",
             )
-        if slt.session_state.ROOM.ROOM_ID == "local" or slt.session_state.OWNER:
-            GAME_CONTROL.button(
+        if session_state.ROOM.ROOM_ID == "local" or session_state.OWNER:
+            RESTART.button(
                 "Restart",
                 on_click=restart,
                 help="Clear the board as well as the scores",
             )
-        if slt.session_state.ROOM.ROOM_ID != "local" and GAME_CONTROL.button(
-            "Exit room"
-        ):
-            if slt.session_state.OWNER:
+        if session_state.ROOM.ROOM_ID != "local" and EXIT.button("Exit room"):
+            if session_state.OWNER:
                 with server_state_lock["ROOMS"]:
                     server_rooms = server_state.ROOMS
-                    del server_rooms[slt.session_state.ROOM.ROOM_ID]
+                    del server_rooms[session_state.ROOM.ROOM_ID]
                     server_state.ROOMS = server_rooms
-            slt.session_state.ROOM = Room("local")
+            session_state.ROOM.ROOM_ID = "local"
+            session_state.OWNER = False
+            restart()
+            switch_multiplayer()
+            EXIT.empty()
 
     # Infos
     def draw_info() -> None:
         # Text information
         TITLE.subheader("**5️⃣ Gomoku Game in Streamlit**")
-        if slt.session_state.ROOM.ROOM_ID == "local":
-            PLAY_MODE_INFO.write(
-                """
-                ---
-
-                **Local play mode**
-
-                You can play with your friend locally.
-                """
-            )
-        else:
-            PLAY_MODE_INFO.write(
-                f"""
-                ---
-
-                **Remote play mode**
-
-                Currently running games: {len(server_state.ROOMS)}
-
-                Create or join a room to play remotely.
-                """
-            )
+        PLAY_MODE_INFO.write("---\n\n**Room Control**")
+        PLAY_MODE_INFO.metric(
+            "Current active rooms on server:", len(server_state.ROOMS)
+        )
+        PLAY_MODE_INFO.write("Create or join a room to play remotely.")
         GAME_INFO.markdown(
             """
             ---
@@ -448,23 +441,23 @@ def gomoku():
         )
         # History scores
         SCORE_TAG.subheader("Scores")
-        SCORE_PLATE[0].metric("White", slt.session_state.ROOM.HISTORY[0])
-        SCORE_PLATE[1].metric("Black", slt.session_state.ROOM.HISTORY[1])
+        SCORE_PLATE[0].metric("White", session_state.ROOM.HISTORY[0])
+        SCORE_PLATE[1].metric("Black", session_state.ROOM.HISTORY[1])
         # Additional information
-        if slt.session_state.ROOM.WINNER != _BLANK:
+        if session_state.ROOM.WINNER != _BLANK:
             ROUND_INFO.write(
-                f"#### **{_PLAYER_COLOR[slt.session_state.ROOM.WINNER]} wins!**"
+                f"#### **{_PLAYER_COLOR[session_state.ROOM.WINNER]} wins!**"
             )
-        elif 0 not in slt.session_state.ROOM.BOARD:
+        elif 0 not in session_state.ROOM.BOARD:
             ROUND_INFO.write("#### **Tie**")
         else:
-            if slt.session_state.ROOM.ROOM_ID != "local":
+            if session_state.ROOM.ROOM_ID != "local":
                 ROUND_INFO.write(
-                    f"#### **{_PLAYER_SYMBOL[slt.session_state.ROOM.TURN]} {_PLAYER_COLOR[slt.session_state.ROOM.TURN]}'s turn... {_ROOM_ANNOTATION[_ROOM_COLOR[slt.session_state.OWNER] == slt.session_state.ROOM.TURN]}**"
+                    f"#### **{_PLAYER_SYMBOL[session_state.ROOM.TURN]} {_PLAYER_COLOR[session_state.ROOM.TURN]}'s turn... {_ROOM_ANNOTATION[_ROOM_COLOR[session_state.OWNER] == session_state.ROOM.TURN]}**"
                 )
             else:
                 ROUND_INFO.write(
-                    f"#### **{_PLAYER_SYMBOL[slt.session_state.ROOM.TURN]} {_PLAYER_COLOR[slt.session_state.ROOM.TURN]}'s turn...**"
+                    f"#### **{_PLAYER_SYMBOL[session_state.ROOM.TURN]} {_PLAYER_COLOR[session_state.ROOM.TURN]}'s turn...**"
                 )
 
     # The main game loop
