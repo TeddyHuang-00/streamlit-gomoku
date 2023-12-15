@@ -1,4 +1,4 @@
 numpy
 scipy
-streamlit==0.89.0
+streamlit==1.11.1
 streamlit_server_state==0.6.1
